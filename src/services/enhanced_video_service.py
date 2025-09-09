@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 
 from src.analysis.video_analyzer import VideoAnalyzer
 from src.services.rag_service import TrafficAccidentRAGService
-from src.models.domain import AnalysisReport, FrameAnalysis
+from src.models.domain import AnalysisReport, FrameAnalysis, AIAnalysis, RiskAssessment
 
 class EnhancedVideoProcessingService:
     """
@@ -41,12 +41,22 @@ class EnhancedVideoProcessingService:
             ai_analysis = await self._perform_ai_analysis(frame_analysis_results, video_metadata)
             
             # 4. 최종 리포트 생성
+            # AI 분석 결과를 모델로 변환
+            risk_assessment_model = RiskAssessment(**ai_analysis['risk_assessment'])
+            ai_analysis_model = AIAnalysis(
+                summary=ai_analysis['summary'],
+                detailed_analysis=ai_analysis.get('detailed_analysis'),
+                risk_assessment=risk_assessment_model,
+                recommendations=ai_analysis['recommendations'],
+                ai_confidence=ai_analysis['ai_confidence']
+            )
+            
             report = AnalysisReport(
                 filename=video_file.filename,
                 duration=video_metadata['duration'],
                 summary=ai_analysis['summary'],
                 frames=frame_analysis_results,
-                ai_analysis=ai_analysis,  # 새로운 필드 추가
+                ai_analysis=ai_analysis_model,
                 risk_assessment=ai_analysis.get('risk_assessment', {}),
                 recommendations=ai_analysis.get('recommendations', [])
             )
@@ -87,8 +97,14 @@ class EnhancedVideoProcessingService:
         if not self.rag_service:
             return {
                 'summary': '기본적인 객체 탐지가 완료되었습니다. AI 분석을 위해서는 OpenAI API 키가 필요합니다.',
-                'risk_assessment': {'level': 'unknown', 'confidence': 0.0},
-                'recommendations': ['OpenAI API 키를 설정하여 고급 분석을 사용하세요.']
+                'risk_assessment': {
+                    'level': 'unknown', 
+                    'score': 0.0,
+                    'confidence': 0.0,
+                    'factors': ['API 키 설정 필요']
+                },
+                'recommendations': ['OpenAI API 키를 설정하여 고급 분석을 사용하세요.'],
+                'ai_confidence': 0.0
             }
         
         # 모든 프레임에서 탐지된 객체들 수집
@@ -134,8 +150,14 @@ class EnhancedVideoProcessingService:
             print(f"AI analysis error: {e}")
             return {
                 'summary': f'객체 탐지는 완료되었으나 AI 분석 중 오류가 발생했습니다: {str(e)}',
-                'risk_assessment': {'level': 'unknown', 'confidence': 0.0},
-                'recommendations': ['시스템 설정을 확인하고 다시 시도해주세요.']
+                'risk_assessment': {
+                    'level': 'unknown', 
+                    'score': 0.0,
+                    'confidence': 0.0,
+                    'factors': ['분석 오류 발생']
+                },
+                'recommendations': ['시스템 설정을 확인하고 다시 시도해주세요.'],
+                'ai_confidence': 0.0
             }
     
     def _generate_context(self, detected_objects: List[Dict], metadata: Dict) -> str:
