@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+ultralytics
+python-multipart
+openai
+langchain
+langchain-openai
+chromadb
+sentence-transformers
+opencv-python
